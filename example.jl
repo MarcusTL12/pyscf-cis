@@ -95,3 +95,32 @@ function benzene()
 
     @time transition_dipole(mol, hf, cis_v)
 end
+
+function benzene_speed()
+    mol = pyscf.M(atom="""
+    C  -1.664244  -0.360809   0.000000
+    C  -0.275880  -0.334582   0.000000
+    C   0.395745   0.880796   0.000000
+    C  -0.321200   2.070000   0.000000
+    C  -1.709559   2.043702  -0.000000
+    C  -2.381247   0.828355  -0.000000
+    H  -3.463284   0.807970  -0.000000
+    H  -2.187521  -1.308116   0.000000
+    H   0.282794  -1.261455   0.000000
+    H   1.477780   0.901181   0.000000
+    H   0.202080   3.017307   0.000000
+    H  -2.268234   2.970572  -0.000000
+    """; basis="ccpvtz")
+
+    hf = @time mol.RHF().run()
+
+    nocc, nvir = mol.nelectron ÷ 2 - 6, 5
+
+    cis = @time construct_reduced_cis_matrix_smart(mol, hf, nocc, nvir)
+
+    e, c = @time eigen(cis, 1:4)
+
+    @show e
+
+    reshape(c, (nocc, nvir, size(c, 2)))
+end

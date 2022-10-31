@@ -56,6 +56,67 @@ function construct_cis_matrix_smart(mol, hf)
     Symmetric(reshape(cis, (nocc * nvir, nocc * nvir)))
 end
 
+function construct_reduced_cis_matrix_smart(mol, hf, nocc, nvir)
+    nocc_hf = mol.nelectron ÷ 2
+
+    occ = (nocc_hf-nocc+1):nocc_hf
+    vir = (nocc_hf+1):(nocc_hf+nvir)
+
+    c_occ = hf.mo_coeff[:, occ]
+    c_vir = hf.mo_coeff[:, vir]
+
+    g_ao = mol.intor("int2e", aosym="s8")
+    g_col = reshape(
+        pyscf.ao2mo.incore.general(g_ao, (c_vir, c_vir, c_occ, c_occ),
+            compact=false),
+        (nvir, nvir, nocc, nocc)
+    )
+    g_exc = reshape(
+        pyscf.ao2mo.incore.general(g_ao, (c_occ, c_vir, c_vir, c_occ),
+            compact=false),
+        (nvir, nocc, nocc, nvir)
+    )
+
+    cis = [2g_exc[a, i, j, b] - g_col[a, b, j, i]
+           for i in 1:nocc, a in 1:nvir, j in 1:nocc, b in 1:nvir]
+
+    for (ni, i) in enumerate(occ), (na, a) in enumerate(vir)
+        cis[ni, na, ni, na] += hf.mo_energy[a] - hf.mo_energy[i]
+    end
+
+    Symmetric(reshape(cis, (nocc * nvir, nocc * nvir)))
+end
+
+function construct_reduced_cis_matrix_outcore(mol, hf, nocc, nvir)
+    nocc_hf = mol.nelectron ÷ 2
+
+    occ = (nocc_hf-nocc+1):nocc_hf
+    vir = (nocc_hf+1):(nocc_hf+nvir)
+
+    c_occ = hf.mo_coeff[:, occ]
+    c_vir = hf.mo_coeff[:, vir]
+
+    g_col = reshape(
+        pyscf.ao2mo.outcore.general_iofree(mol, (c_vir, c_vir, c_occ, c_occ),
+            compact=false),
+        (nvir, nvir, nocc, nocc)
+    )
+    g_exc = reshape(
+        pyscf.ao2mo.outcore.general_iofree(mol, (c_occ, c_vir, c_vir, c_occ),
+            compact=false),
+        (nvir, nocc, nocc, nvir)
+    )
+
+    cis = [2g_exc[a, i, j, b] - g_col[a, b, j, i]
+           for i in 1:nocc, a in 1:nvir, j in 1:nocc, b in 1:nvir]
+
+    for (ni, i) in enumerate(occ), (na, a) in enumerate(vir)
+        cis[ni, na, ni, na] += hf.mo_energy[a] - hf.mo_energy[i]
+    end
+
+    Symmetric(reshape(cis, (nocc * nvir, nocc * nvir)))
+end
+
 function transition_dipole(mol, hf, cis_vec, proj_norm=true)
     nao = mol.nao
     nocc = mol.nelectron ÷ 2
@@ -69,7 +130,7 @@ function transition_dipole(mol, hf, cis_vec, proj_norm=true)
 
     d_ov = reshape(pyscf.lib.einsum("qxy,xi,yj->qij",
             mol.intor("int1e_r"), c_occ, c_vir), (3, nocc * nvir))
-    
+
     td = pyscf.lib.einsum("qi,ij->qj", d_ov, cis_vec)
 
     if proj_norm
