@@ -30,3 +30,7 @@ H_diag = δ(i, j) * δ(a, b) * E_hf * occ |> simplify_heavy
 A_aibj = H_offdiag - H_diag |> simplify_heavy
 
 println("A_aibj = ", (A_aibj, trans))
+
+ψ = ∑(real_tensor("C", 1, 2) * E(1, 2) * occupied(2) * virtual(1), 1:2)
+
+d = ∑(real_tensor("d", 1, 2) * E(1, 2), 1:2)
