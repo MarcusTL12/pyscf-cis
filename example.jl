@@ -110,7 +110,7 @@ function benzene_speed()
     H   1.477780   0.901181   0.000000
     H   0.202080   3.017307   0.000000
     H  -2.268234   2.970572  -0.000000
-    """; basis="ccpvtz")
+    """; basis="ccpvdz")
 
     hf = @time mol.RHF().run()
 
@@ -118,9 +118,15 @@ function benzene_speed()
 
     cis = @time construct_reduced_cis_matrix_smart(mol, hf, nocc, nvir)
 
-    e, c = @time eigen(cis, 1:4)
+    n_ex = 6
 
-    @show e
+    cis_ee, cis_v = @time eigen(cis, 1:n_ex)
 
-    reshape(c, (nocc, nvir, size(c, 2)))
+    cis_ee = cis_ee * au2ev
+    @show cis_ee
+
+    nm = 1239.84193 ./ cis_ee
+    @show nm
+
+    @time transition_dipole_reduced(mol, hf, cis_v, nocc, nvir)
 end
